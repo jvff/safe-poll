@@ -1,0 +1,114 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="API documentation for the Rust `safe_poll` crate."><meta name="keywords" content="rust, rustlang, rust-lang, safe_poll"><title>safe_poll - Rust</title><link rel="stylesheet" type="text/css" href="../normalize.css"><link rel="stylesheet" type="text/css" href="../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../light.css"  id="themeStyle"><link rel="stylesheet" type="text/css" href="../dark.css" disabled ><link rel="stylesheet" type="text/css" href="../ayu.css" disabled ><script id="default-settings"></script><script src="../storage.js"></script><noscript><link rel="stylesheet" href="../noscript.css"></noscript><link rel="icon" type="image/svg+xml" href="../favicon.svg">
+<link rel="alternate icon" type="image/png" href="../favicon-16x16.png">
+<link rel="alternate icon" type="image/png" href="../favicon-32x32.png"><style type="text/css">#crate-search{background-image:url("../down-arrow.svg");}</style></head><body class="rustdoc mod"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu">&#9776;</div><a href='../safe_poll/index.html'><div class='logo-container rust-logo'><img src='../rust-logo.png' alt='logo'></div></a><p class="location">Crate safe_poll</p><div class="block version"><p>Version 0.1.0</p></div><div class="sidebar-elems"><a id="all-types" href="all.html"><p>See all safe_poll's items</p></a><div class="block items"><ul><li><a href="#structs">Structs</a></li><li><a href="#enums">Enums</a></li><li><a href="#traits">Traits</a></li></ul></div><p class="location"></p><script>window.sidebarCurrent = {name: "safe_poll", ty: "mod", relpath: "../"};</script></div></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu"><img src="../brush.svg" width="18" alt="Pick another theme!"></button><div id="theme-choices" role="menu"></div></div><script src="../theme.js"></script><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" class="help-button">?</button>
+                <a id="settings-menu" href="../settings.html"><img src="../wheel.svg" width="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><h1 class="fqn"><span class="out-of-band"><span id="render-detail"><a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class="inner">&#x2212;</span>]</a></span><a class="srclink" href="../src/safe_poll/lib.rs.html#1-246" title="goto source code">[src]</a></span><span class="in-band">Crate <a class="mod" href="">safe_poll</a></span></h1><div class="docblock"><p>Abstractions to help to avoid writing <a href="https://doc.rust-lang.org/nightly/core/future/future/trait.Future.html" title="Future"><code>Future</code></a> implementations that never wake up.</p>
+<p>This crate experiments with using Rust's type system to help avoid one common pitfall when
+writing manual implementations of <a href="https://doc.rust-lang.org/nightly/core/future/future/trait.Future.html" title="Future"><code>Future</code></a>. Every implementation of <a href="https://doc.rust-lang.org/nightly/core/future/future/trait.Future.html#tymethod.poll" title="Future::poll"><code>Future::poll</code></a> returns
+<a href="https://doc.rust-lang.org/nightly/core/task/poll/enum.Poll.html" title="Poll"><code>Poll</code></a>. <a href="https://doc.rust-lang.org/nightly/core/task/poll/enum.Poll.html" title="Poll"><code>Poll</code></a> has two variants, <a href="https://doc.rust-lang.org/nightly/core/task/poll/enum.Poll.html#variant.Ready" title="Poll::Ready"><code>Poll::Ready</code></a> to represent when the asynchronous
+computation has produced a value and <a href="https://doc.rust-lang.org/nightly/core/task/poll/enum.Poll.html#variant.Pending" title="Poll::Pending"><code>Poll::Pending</code></a> when the asynchronous computation isn't
+ready to produce a value yet, and should be polled again later. Returning <a href="https://doc.rust-lang.org/nightly/core/task/poll/enum.Poll.html#variant.Pending" title="Poll::Pending"><code>Poll::Pending</code></a>
+requires having the current task registered for a wakeup when it should be polled again.
+Returning <a href="https://doc.rust-lang.org/nightly/core/task/poll/enum.Poll.html#variant.Pending" title="Poll::Pending"><code>Poll::Pending</code></a> without registering for a wakeup will mean that the current task
+will never be polled again, and therefore it will never advance its computation.</p>
+<p>An example of this pitfall follows:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered">
+<span class="kw">struct</span> <span class="ident">MyFuture</span> {
+    <span class="ident">inner_stream</span>: <span class="ident">Pin</span><span class="op">&lt;</span><span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Stream</span><span class="op">&lt;</span><span class="ident">Item</span> <span class="op">=</span> <span class="ident">usize</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+}
+
+<span class="kw">impl</span> <span class="ident">Future</span> <span class="kw">for</span> <span class="ident">MyFuture</span> {
+    <span class="kw">type</span> <span class="ident">Output</span> <span class="op">=</span> <span class="ident">usize</span>;
+
+    <span class="kw">fn</span> <span class="ident">poll</span>(<span class="kw-2">mut</span> <span class="self">self</span>: <span class="ident">Pin</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">Self</span><span class="op">&gt;</span>, <span class="ident">context</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Context</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Poll</span><span class="op">&lt;</span><span class="self">Self</span>::<span class="ident">Output</span><span class="op">&gt;</span> {
+        <span class="kw">match</span> <span class="self">self</span>.<span class="ident">as_mut</span>().<span class="ident">inner_stream</span>.<span class="ident">as_mut</span>().<span class="ident">poll_next</span>(<span class="ident">context</span>) {
+            <span class="ident">Poll</span>::<span class="ident">Ready</span>(<span class="prelude-val">None</span>) <span class="op">=</span><span class="op">&gt;</span> {
+                <span class="macro">unreachable</span><span class="macro">!</span>(<span class="string">&quot;The inner stream will produce at least one positive integer&quot;</span>);
+            }
+            <span class="ident">Poll</span>::<span class="ident">Ready</span>(<span class="prelude-val">Some</span>(<span class="ident">value</span>)) <span class="kw">if</span> (<span class="ident">value</span> <span class="op">&gt;</span> <span class="number">0</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">Poll</span>::<span class="ident">Ready</span>(<span class="ident">value</span>),
+            <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">Poll</span>::<span class="ident">Pending</span>,
+        }
+    }
+}</pre></div>
+<p>In this example, the intention is pretty clear. The developer wants the future to only complete
+when the inner stream of asynchronous computations results in a positive value. However, if the
+inner stream produces a zero, although the intention is for <code>MyFuture</code> to always be polled
+again if it returns <a href="https://doc.rust-lang.org/nightly/core/task/poll/enum.Poll.html#variant.Pending" title="Poll::Pending"><code>Poll::Pending</code></a>, it will not be polled ever again if the <code>inner_stream</code>
+produces a zero before producing a positive integer. If that happens, <code>MyFuture</code> will never
+complete.</p>
+<p>Note that this is not a great example, because it could be replaced by simpler and safer code,
+like:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered">
+<span class="kw">use</span> <span class="ident">futures</span>::{<span class="ident">future</span>, <span class="ident">FutureExt</span>, <span class="ident">Stream</span>, <span class="ident">StreamExt</span>};
+<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">future</span>::<span class="ident">Future</span>;
+
+<span class="kw">fn</span> <span class="ident">make_my_future</span>(<span class="ident">stream</span>: <span class="kw">impl</span> <span class="ident">Stream</span><span class="op">&lt;</span><span class="ident">Item</span> <span class="op">=</span> <span class="ident">usize</span><span class="op">&gt;</span> <span class="op">+</span> <span class="ident">Unpin</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw">impl</span> <span class="ident">Future</span><span class="op">&lt;</span><span class="ident">Output</span> <span class="op">=</span> <span class="ident">usize</span><span class="op">&gt;</span> {
+    <span class="ident">stream</span>
+        .<span class="ident">filter</span>(<span class="op">|</span><span class="kw-2">&amp;</span><span class="ident">value</span><span class="op">|</span> <span class="ident">future</span>::<span class="ident">ready</span>(<span class="ident">value</span> <span class="op">&gt;</span> <span class="number">0</span>))
+        .<span class="ident">into_future</span>()
+        .<span class="ident">map</span>(<span class="op">|</span>(<span class="ident">item</span>, <span class="ident">_rest_of_stream</span>)<span class="op">|</span> {
+            <span class="ident">item</span>.<span class="ident">expect</span>(<span class="string">&quot;The inner stream will produce at least one positive integer&quot;</span>)
+        })
+}</pre></div>
+<p>The purpose of this crate is to try to help avoiding the pitfall described above using the type
+system. The crate introduces a new <a href="../safe_poll/enum.SafePoll.html" title="SafePoll"><code>SafePoll</code></a> type that's equivalent to <a href="https://doc.rust-lang.org/nightly/core/task/poll/enum.Poll.html" title="Poll"><code>Poll</code></a>, but the
+<a href="../safe_poll/enum.SafePoll.html#variant.Pending" title="SafePoll::Pending"><code>SafePoll::Pending</code></a> variant requires a special token to be created. That token is of a new
+<a href="../safe_poll/struct.WakeupRegisteredToken.html" title="WakeupRegisteredToken"><code>WakeupRegisteredToken</code></a> type, which can only be created in an <code>unsafe</code> block. However, once a
+token is created, it can be returned inside <a href="../safe_poll/enum.SafePoll.html#variant.Pending" title="SafePoll::Pending"><code>SafePoll::Pending</code></a> and any outer types that are
+asynchronous can just forward that token to outer layers without any <code>unsafe</code> blocks. This
+means that an <code>unsafe</code> block is required when the type system can't guarantee that a wakeup was
+registered, which is usually done once, deep inside the code where the low-level details of
+wakeup registration are handled. The idea is that <code>unsafe</code> blocks make it easier for developers
+to find where wakeups need to be properly registered, so that it's easier to verify and harder
+to make mistakes.</p>
+<p>The goal is for the initial example to become something more correct, even if it's more
+complex:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered">
+<span class="attribute">#[<span class="ident">pin_project</span>]</span>
+<span class="kw">struct</span> <span class="ident">MyFuture</span> {
+    <span class="attribute">#[<span class="ident">pin</span>]</span>
+    <span class="ident">inner_stream</span>: <span class="ident">Pin</span><span class="op">&lt;</span><span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Stream</span><span class="op">&lt;</span><span class="ident">Item</span> <span class="op">=</span> <span class="ident">usize</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+}
+
+<span class="kw">impl</span> <span class="ident">SafeFuture</span> <span class="kw">for</span> <span class="ident">MyFuture</span> {
+    <span class="kw">type</span> <span class="ident">Output</span> <span class="op">=</span> <span class="ident">usize</span>;
+
+    <span class="kw">fn</span> <span class="ident">safe_poll</span>(<span class="kw-2">mut</span> <span class="self">self</span>: <span class="ident">Pin</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">Self</span><span class="op">&gt;</span>, <span class="ident">context</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Context</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">SafePoll</span><span class="op">&lt;</span><span class="self">Self</span>::<span class="ident">Output</span><span class="op">&gt;</span> {
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">this</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">project</span>();
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">inner_stream</span> <span class="op">=</span> <span class="ident">this</span>.<span class="ident">inner_stream</span>.<span class="ident">as_mut</span>();
+
+        <span class="kw">loop</span> {
+            <span class="kw">let</span> <span class="ident">next_item_future</span> <span class="op">=</span> <span class="ident">AssumeSafe</span>(<span class="ident">inner_stream</span>.<span class="ident">next</span>());
+
+            <span class="macro">pin_mut</span><span class="macro">!</span>(<span class="ident">next_item_future</span>);
+
+            <span class="kw">match</span> <span class="ident">next_item_future</span>.<span class="ident">safe_poll</span>(<span class="ident">context</span>) {
+                <span class="ident">SafePoll</span>::<span class="ident">Ready</span>(<span class="prelude-val">None</span>) <span class="op">=</span><span class="op">&gt;</span> {
+                    <span class="macro">unreachable</span><span class="macro">!</span>(<span class="string">&quot;The inner stream will produce at least one positive integer&quot;</span>);
+                }
+                <span class="ident">SafePoll</span>::<span class="ident">Ready</span>(<span class="prelude-val">Some</span>(<span class="number">0</span>)) <span class="op">=</span><span class="op">&gt;</span> <span class="kw">continue</span>,
+                <span class="ident">SafePoll</span>::<span class="ident">Ready</span>(<span class="prelude-val">Some</span>(<span class="ident">value</span>)) <span class="op">=</span><span class="op">&gt;</span> <span class="kw">return</span> <span class="ident">SafePoll</span>::<span class="ident">Ready</span>(<span class="ident">value</span>),
+                <span class="ident">SafePoll</span>::<span class="ident">Pending</span>(<span class="ident">token</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="kw">return</span> <span class="ident">SafePoll</span>::<span class="ident">Pending</span>(<span class="ident">token</span>),
+            }
+        }
+    }
+}
+
+<span class="kw">impl</span> <span class="ident">Future</span> <span class="kw">for</span> <span class="ident">MyFuture</span> {
+    <span class="kw">type</span> <span class="ident">Output</span> <span class="op">=</span> <span class="op">&lt;</span><span class="self">Self</span> <span class="kw">as</span> <span class="ident">SafeFuture</span><span class="op">&gt;</span>::<span class="ident">Output</span>;
+
+    <span class="kw">fn</span> <span class="ident">poll</span>(<span class="self">self</span>: <span class="ident">Pin</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">Self</span><span class="op">&gt;</span>, <span class="ident">context</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Context</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Poll</span><span class="op">&lt;</span><span class="self">Self</span>::<span class="ident">Output</span><span class="op">&gt;</span> {
+        <span class="self">self</span>.<span class="ident">safe_poll</span>(<span class="ident">context</span>).<span class="ident">into</span>()
+    }
+}</pre></div>
+</div><h2 id="structs" class="section-header"><a href="#structs">Structs</a></h2>
+<table><tr class="module-item"><td><a class="struct" href="struct.AssumeSafe.html" title="safe_poll::AssumeSafe struct">AssumeSafe</a></td><td class="docblock-short"><p>A wrapper type that forces the assumption that the inner type correctly registers wakeups.</p>
+</td></tr><tr class="module-item"><td><a class="struct" href="struct.WakeupRegisteredToken.html" title="safe_poll::WakeupRegisteredToken struct">WakeupRegisteredToken</a></td><td class="docblock-short"><p>A zero-sized marker type to indicate that the current task was correctly registered for waking
+up to be polled again later.</p>
+</td></tr></table><h2 id="enums" class="section-header"><a href="#enums">Enums</a></h2>
+<table><tr class="module-item"><td><a class="enum" href="enum.SafePoll.html" title="safe_poll::SafePoll enum">SafePoll</a></td><td class="docblock-short"><p>An equivalent to <a href="https://doc.rust-lang.org/nightly/core/task/poll/enum.Poll.html" title="Poll"><code>Poll</code></a> that requires a marker token for the <a href="../safe_poll/enum.SafePoll.html#variant.Pending" title="SafePoll::Pending"><code>SafePoll::Pending</code></a> variant.</p>
+</td></tr></table><h2 id="traits" class="section-header"><a href="#traits">Traits</a></h2>
+<table><tr class="module-item"><td><a class="trait" href="trait.SafeFuture.html" title="safe_poll::SafeFuture trait">SafeFuture</a></td><td class="docblock-short"><p>An equivalent to <a href="https://doc.rust-lang.org/nightly/core/future/future/trait.Future.html" title="Future"><code>Future</code></a> which returns <a href="../safe_poll/enum.SafePoll.html" title="SafePoll"><code>SafePoll</code></a> instead of <a href="https://doc.rust-lang.org/nightly/core/task/poll/enum.Poll.html" title="Poll"><code>Poll</code></a>.</p>
+</td></tr></table></section><section id="search" class="content hidden"></section><section class="footer"></section><script>window.rootPath = "../";window.currentCrate = "safe_poll";</script><script src="../main.js"></script><script defer src="../search-index.js"></script></body></html>

@@ -1,0 +1,3 @@
+(function() {var implementors = {};
+implementors["safe_poll"] = [{"text":"impl Sync for WakeupRegisteredToken","synthetic":true,"types":[]},{"text":"impl&lt;T&gt; Sync for SafePoll&lt;T&gt; <span class=\"where fmt-newline\">where<br>&nbsp;&nbsp;&nbsp;&nbsp;T: Sync,&nbsp;</span>","synthetic":true,"types":[]},{"text":"impl&lt;T&gt; Sync for AssumeSafe&lt;T&gt; <span class=\"where fmt-newline\">where<br>&nbsp;&nbsp;&nbsp;&nbsp;T: Sync,&nbsp;</span>","synthetic":true,"types":[]}];
+if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()
