@@ -73,7 +73,7 @@
 //! The goal is for the initial example to become something more correct, even if it's more
 //! complex:
 //!
-//! ```ignore
+//! ```
 //! # use futures::{Stream, StreamExt};
 //! # use pin_project::pin_project;
 //! # use pin_utils::pin_mut;
