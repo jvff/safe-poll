@@ -118,11 +118,9 @@
 //!     }
 //! }
 //! ```
-//!
-//! [`Future`]: std::future::Future
-//! [`Future::poll`]: std::future::Future::poll
 
 use std::{
+    future::Future,
     marker::PhantomData,
     pin::Pin,
     task::{Context, Poll},
@@ -179,8 +177,6 @@ pub enum SafePoll<T> {
     ///
     /// This is a equivalent to [`Poll::Pending`], with the extra requirement of the token to
     /// indicate that the [`Future`] was correctly registered for a wakeup to be polled again.
-    ///
-    /// [`Future`]: std::future::Future
     Pending(WakeupRegisteredToken),
 }
 
@@ -210,12 +206,10 @@ pub struct AssumeSafe<T>(pub T);
 /// possible to fulfill that constraint either by having an internal type return
 /// [`SafePoll::Pending`] with a token that can be reused or by manually creating the token inside
 /// an `unsafe` block.
-///
-/// [`Future`]: std::future::Future
 pub trait SafeFuture {
     /// The type of value produced on completion.
     ///
-    /// Equivalent to [`Future::Output`](std::future::Future::Output).
+    /// Equivalent to [`Future::Output`].
     type Output;
 
     /// Attempt to resolve the asynchronous computation to a final value, registering the current
@@ -223,7 +217,30 @@ pub trait SafeFuture {
     ///
     /// Equivalent to [`Future::poll`], except it returns a [`SafePoll`] to help ensure that the
     /// current task was correctly registered for a wakeup.
-    ///
-    /// [`Future::poll`]: std::future::Future::poll
     fn safe_poll(self: Pin<&mut Self>, context: &mut Context) -> SafePoll<Self::Output>;
+}
+
+/// A [`SafeFuture`] implementation for a wrapped [`Future`] assumed to be safe.
+///
+/// This makes it easier to use existing types that implement [`Future`], with the assumption that
+/// they were correctly implemented and will register the current task to wakeup when returning
+/// [`Poll::Pending`].
+impl<F> SafeFuture for AssumeSafe<F>
+where
+    F: Future,
+{
+    type Output = F::Output;
+
+    fn safe_poll(self: Pin<&mut Self>, context: &mut Context) -> SafePoll<Self::Output> {
+        let inner = unsafe {
+            let pinned_self = Pin::into_inner_unchecked(self);
+
+            Pin::new_unchecked(&mut pinned_self.0)
+        };
+
+        match inner.poll(context) {
+            Poll::Ready(output) => SafePoll::Ready(output),
+            Poll::Pending => SafePoll::Pending(unsafe { WakeupRegisteredToken::new() }),
+        }
+    }
 }
