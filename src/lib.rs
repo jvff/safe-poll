@@ -61,7 +61,7 @@
 //! The purpose of this crate is to try to help avoiding the pitfall described above using the type
 //! system. The crate introduces a new `SafePoll` type that's equivalent to [`Poll`], but the
 //! `SafePoll::Pending` variant requires a special token to be created. That token is of a new
-//! `WakeupRegisteredToken` type, which can only be created in an `unsafe` block. However, once a
+//! [`WakeupRegisteredToken`] type, which can only be created in an `unsafe` block. However, once a
 //! token is created, it can be returned inside `SafePoll::Pending` and any outer types that are
 //! asynchronous can just forward that token to outer layers without any `unsafe` blocks. This
 //! means that an `unsafe` block is required when the type system can't guarantee that a wakeup was
@@ -124,3 +124,40 @@
 //! [`Poll`]: std::task::Poll
 //! [`Poll::Ready`]: std::task::Poll::Ready
 //! [`Poll::Pending`]: std::task::Poll::Pending
+
+use std::marker::PhantomData;
+
+/// A zero-sized marker type to indicate that the current task was correctly registered for waking
+/// up to be polled again later.
+///
+/// This type only has an `unsafe` constructor, because it can only be constructed after the
+/// current task was correctly registered to wake up and be polled again after returning. However,
+/// it is possible to obtain the token without any `unsafe` blocks by extracting it from a
+/// `SafePoll` returned from a poll to an inner type.
+///
+/// # Safety
+///
+/// Creating this type without correctly registering the current task for a wakeup might lead to a
+/// situation where the task is never polled again.
+#[derive(Debug)]
+pub struct WakeupRegisteredToken {
+    _inner: PhantomData<()>,
+}
+
+impl WakeupRegisteredToken {
+    /// Create a new token indicating that the current task was registered for a wakeup to be
+    /// polled again.
+    ///
+    /// This should only be called after properly registering the current task for a wakeup using
+    /// the [`Context`](std::task::Context) provided in the poll method implementation.
+    ///
+    /// # Safety
+    ///
+    /// Calling this method without correctly registering the current task for a wakeup might lead
+    /// to a situation where the task is never polled again.
+    pub unsafe fn new() -> Self {
+        WakeupRegisteredToken {
+            _inner: PhantomData,
+        }
+    }
+}
