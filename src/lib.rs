@@ -121,11 +121,8 @@
 //!
 //! [`Future`]: std::future::Future
 //! [`Future::poll`]: std::future::Future::poll
-//! [`Poll`]: std::task::Poll
-//! [`Poll::Ready`]: std::task::Poll::Ready
-//! [`Poll::Pending`]: std::task::Poll::Pending
 
-use std::marker::PhantomData;
+use std::{marker::PhantomData, task::Poll};
 
 /// A zero-sized marker type to indicate that the current task was correctly registered for waking
 /// up to be polled again later.
@@ -166,13 +163,11 @@ impl WakeupRegisteredToken {
 ///
 /// The [`WakeupRegisteredToken`] can only be obtained either by polling an inner type that also
 /// returns [`SafePoll`], or by manually constructing the token inside an `unsafe` block.
-///
-/// [`Poll`]: std::task::Poll
 #[derive(Debug)]
 pub enum SafePoll<T> {
     /// Represents a value that is immediately ready.
     ///
-    /// Equivalent to [`Poll::Ready`](std::task::Poll::Ready).
+    /// Equivalent to [`Poll::Ready`].
     Ready(T),
 
     /// Represents that a value is not ready yet and that the [`Future`] was correctly registered
@@ -182,6 +177,15 @@ pub enum SafePoll<T> {
     /// indicate that the [`Future`] was correctly registered for a wakeup to be polled again.
     ///
     /// [`Future`]: std::future::Future
-    /// [`Poll::Pending`]: std::task::Poll::Pending
     Pending(WakeupRegisteredToken),
+}
+
+/// Conversion from [`SafePoll`] to [`Poll`] that simply drops the [`WakeupRegisteredToken`].
+impl<T> From<SafePoll<T>> for Poll<T> {
+    fn from(safe_poll: SafePoll<T>) -> Poll<T> {
+        match safe_poll {
+            SafePoll::Ready(value) => Poll::Ready(value),
+            SafePoll::Pending(_token) => Poll::Pending,
+        }
+    }
 }
