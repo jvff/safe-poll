@@ -122,7 +122,11 @@
 //! [`Future`]: std::future::Future
 //! [`Future::poll`]: std::future::Future::poll
 
-use std::{marker::PhantomData, task::Poll};
+use std::{
+    marker::PhantomData,
+    pin::Pin,
+    task::{Context, Poll},
+};
 
 /// A zero-sized marker type to indicate that the current task was correctly registered for waking
 /// up to be polled again later.
@@ -197,3 +201,29 @@ impl<T> From<SafePoll<T>> for Poll<T> {
 /// [`Poll::Pending`] if the current task was registered for a wakeup.
 #[derive(Clone, Copy, Debug)]
 pub struct AssumeSafe<T>(pub T);
+
+/// An equivalent to [`Future`] which returns [`SafePoll`] instead of [`Poll`].
+///
+/// Returning [`SafePoll`] enforces an extra constraint where a previously created
+/// [`WakeupRegisteredToken`] must be used. This extra constraint helps to verify that the
+/// [`SafeFuture`] was properly registered for a wakeup in order to be polled again later. It's
+/// possible to fulfill that constraint either by having an internal type return
+/// [`SafePoll::Pending`] with a token that can be reused or by manually creating the token inside
+/// an `unsafe` block.
+///
+/// [`Future`]: std::future::Future
+pub trait SafeFuture {
+    /// The type of value produced on completion.
+    ///
+    /// Equivalent to [`Future::Output`](std::future::Future::Output).
+    type Output;
+
+    /// Attempt to resolve the asynchronous computation to a final value, registering the current
+    /// task for wakeup if the value is not yet available.
+    ///
+    /// Equivalent to [`Future::poll`], except it returns a [`SafePoll`] to help ensure that the
+    /// current task was correctly registered for a wakeup.
+    ///
+    /// [`Future::poll`]: std::future::Future::poll
+    fn safe_poll(self: Pin<&mut Self>, context: &mut Context) -> SafePoll<Self::Output>;
+}
