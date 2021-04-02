@@ -59,10 +59,10 @@
 //! ```
 //!
 //! The purpose of this crate is to try to help avoiding the pitfall described above using the type
-//! system. The crate introduces a new `SafePoll` type that's equivalent to [`Poll`], but the
-//! `SafePoll::Pending` variant requires a special token to be created. That token is of a new
+//! system. The crate introduces a new [`SafePoll`] type that's equivalent to [`Poll`], but the
+//! [`SafePoll::Pending`] variant requires a special token to be created. That token is of a new
 //! [`WakeupRegisteredToken`] type, which can only be created in an `unsafe` block. However, once a
-//! token is created, it can be returned inside `SafePoll::Pending` and any outer types that are
+//! token is created, it can be returned inside [`SafePoll::Pending`] and any outer types that are
 //! asynchronous can just forward that token to outer layers without any `unsafe` blocks. This
 //! means that an `unsafe` block is required when the type system can't guarantee that a wakeup was
 //! registered, which is usually done once, deep inside the code where the low-level details of
@@ -133,7 +133,7 @@ use std::marker::PhantomData;
 /// This type only has an `unsafe` constructor, because it can only be constructed after the
 /// current task was correctly registered to wake up and be polled again after returning. However,
 /// it is possible to obtain the token without any `unsafe` blocks by extracting it from a
-/// `SafePoll` returned from a poll to an inner type.
+/// [`SafePoll`] returned from a poll to an inner type.
 ///
 /// # Safety
 ///
@@ -160,4 +160,28 @@ impl WakeupRegisteredToken {
             _inner: PhantomData,
         }
     }
+}
+
+/// An equivalent to [`Poll`] that requires a marker token for the [`SafePoll::Pending`] variant.
+///
+/// The [`WakeupRegisteredToken`] can only be obtained either by polling an inner type that also
+/// returns [`SafePoll`], or by manually constructing the token inside an `unsafe` block.
+///
+/// [`Poll`]: std::task::Poll
+#[derive(Debug)]
+pub enum SafePoll<T> {
+    /// Represents a value that is immediately ready.
+    ///
+    /// Equivalent to [`Poll::Ready`](std::task::Poll::Ready).
+    Ready(T),
+
+    /// Represents that a value is not ready yet and that the [`Future`] was correctly registered
+    /// for a wakeup to be polled again.
+    ///
+    /// This is a equivalent to [`Poll::Pending`], with the extra requirement of the token to
+    /// indicate that the [`Future`] was correctly registered for a wakeup to be polled again.
+    ///
+    /// [`Future`]: std::future::Future
+    /// [`Poll::Pending`]: std::task::Poll::Pending
+    Pending(WakeupRegisteredToken),
 }
