@@ -189,3 +189,11 @@ impl<T> From<SafePoll<T>> for Poll<T> {
         }
     }
 }
+
+/// A wrapper type that forces the assumption that the inner type correctly registers wakeups.
+///
+/// This wrapper type makes it easier to interface with existing implementations of asynchronous
+/// types, by assuming that they are correctly implemented and will therefore only return
+/// [`Poll::Pending`] if the current task was registered for a wakeup.
+#[derive(Clone, Copy, Debug)]
+pub struct AssumeSafe<T>(pub T);
