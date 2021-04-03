@@ -76,7 +76,6 @@
 //! ```
 //! # use futures::{Stream, StreamExt};
 //! # use pin_project::pin_project;
-//! # use pin_utils::pin_mut;
 //! # use safe_poll::{AssumeSafe, SafeFuture, SafePoll};
 //! # use std::{future::Future, pin::Pin, task::{Context, Poll}};
 //! #
@@ -94,11 +93,7 @@
 //!         let mut inner_stream = this.inner_stream.as_mut();
 //!
 //!         loop {
-//!             let next_item_future = AssumeSafe(inner_stream.next());
-//!
-//!             pin_mut!(next_item_future);
-//!
-//!             match next_item_future.safe_poll(context) {
+//!             match Pin::new(&mut AssumeSafe(inner_stream.next())).safe_poll(context) {
 //!                 SafePoll::Ready(None) => {
 //!                     unreachable!("The inner stream will produce at least one positive integer");
 //!                 }
